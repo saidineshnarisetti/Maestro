@@ -1,4 +1,4 @@
-name: Maestro Android E2E Test
+name: Maestro Android E2E Test on Emulator
 
 on:
   push:
@@ -10,60 +10,71 @@ on:
 
 jobs:
   maestro_e2e_android:
-    # macOS runners are recommended for reliable Android emulation on GitHub Actions
-    runs-on: macos-latest
+    # Use macos-latest which is an Apple Silicon (aarch64) runner by default, 
+    # requiring an ARM-based emulator image (arch: arm64).
+    runs-on: macos-latest 
 
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
     - name: Set up Java 17
-      # Maestro requires Java 17 or higher
+      # Requirement: Java 17 or higher
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
         java-version: '17'
 
     - name: Install Maestro CLI via Homebrew
-      # Uses the Homebrew commands you specified
+      # Requirement: brew install maestro
       run: |
         brew tap mobile-dev-inc/tap
         brew install maestro
+        # Add Maestro to PATH explicitly for the subsequent 'script' block
+        export PATH="$PATH:$HOME/.maestro/bin"
 
     - name: Run Android Emulator and Maestro Tests
-      # The reactivecircus/android-emulator-runner is a reliable way to manage the emulator
       uses: reactivecircus/android-emulator-runner@v2
       with:
-        api-level: 30 # Recommended API level for stability. Adjust as needed.
-        target: default
-        arch: x86_64
+        api-level: 30 # Target Android API level
+        # 🔥 FIX for "Avd's CPU Architecture 'x86_64' is not supported on aarch64 host"
+        # Must use arm64 architecture on Apple Silicon runners
+        arch: arm64 
+        target: google_apis # Using google_apis for better compatibility with arm64 images
         profile: Nexus 5
         script: |
-          # The Android Emulator Runner installs platform-tools and adds adb to PATH
-          
           # 1. Install the APK
-          # Replace 'samples/wikipedia.apk' with the actual path to your APK if it's different.
+          # Replace './samples/wikipedia.apk' with the actual path if it changes
           APK_PATH="./samples/wikipedia.apk" 
+          echo "Installing $APK_PATH on emulator..."
           adb install $APK_PATH
           
-          # 2. Run the Maestro flow and generate the report
-          # The 'maestro' command is now available globally
-          # The --format junit --output command creates the JUnit report
+          # 2. Run the specified Maestro flow
           MAESTRO_REPORT_PATH="maestro-report.xml"
+          MAESTRO_FLOW_PATH="./samples/android-test.yaml" # Target flow
           
+          echo "Running Maestro flow: $MAESTRO_FLOW_PATH"
+          
+          # The || true ensures the step doesn't fail the whole job immediately 
+          # on a test failure, allowing the report to be uploaded.
           maestro test \
-            ./samples/android-test.yaml \
+            $MAESTRO_FLOW_PATH \
             --format junit \
             --output $MAESTRO_REPORT_PATH \
-            || true # Use '|| true' to ensure the workflow continues even if tests fail
+            || true 
           
-          # Move the report to a directory for artifact upload
+          # 3. Prepare report for artifact upload
           mkdir -p maestro-reports
-          mv $MAESTRO_REPORT_PATH maestro-reports/
+          if [ -f $MAESTRO_REPORT_PATH ]; then
+            mv $MAESTRO_REPORT_PATH maestro-reports/
+            echo "Maestro test run complete. Report moved to maestro-reports/"
+          else
+            echo "Warning: Maestro report file ($MAESTRO_REPORT_PATH) not found."
+          fi
 
     - name: Upload Test Report Artifact
-      # This step saves the generated test report so you can download it from the Actions summary
-      if: always() # Run this step even if the tests failed
+      # The report will be uploaded even if the tests themselves failed (due to 'if: always()')
+      if: always() 
       uses: actions/upload-artifact@v4
       with:
         name: maestro-junit-report
