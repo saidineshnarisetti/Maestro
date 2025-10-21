@@ -1,73 +1,67 @@
-name: Maestro Android E2E Test on Emulator
+name: Maestro Android E2E Tests
 
 on:
+  # Run tests whenever code is pushed to main or a Pull Request is opened
   push:
-    branches:
-      - main
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
+    branches: [ main ]
 
 jobs:
-  maestro_e2e_android:
-    runs-on: macos-latest 
+  maestro_test:
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Set up Java 17
-      uses: actions/setup-java@v4
-      with:
-        distribution: 'temurin'
-        java-version: '17'
+      # 1. Set up Java 17 (as requested)
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
 
-    - name: Install Maestro CLI via Homebrew
-      run: |
-        brew tap mobile-dev-inc/tap
-        brew install maestro
-        export PATH="$PATH:$HOME/.maestro/bin"
+      # 2. Install Maestro (using Homebrew as suggested)
+      - name: Install Maestro CLI
+        run: |
+          brew tap mobile-dev-inc/tap
+          brew install maestro
+          # Verify installation
+          maestro -v
 
-    - name: Run Android Emulator and Maestro Tests
-      uses: reactivecircus/android-emulator-runner@v2
-      with:
-        # 🔥 FIX: Switched to API 33 (Android 13) to avoid the 
-        # "failed to initialize HVF: Invalid argument" error often seen with API 30 on ARM runners.
-        api-level: 33 
-        target: google_apis 
-        profile: Nexus 5
-        arch: arm64-v8a 
-        
-        script: |
-          # 1. Install the APK
-          APK_PATH="./samples/wikipedia.apk" 
-          echo "Installing $APK_PATH on emulator (API 33)..."
-          adb install $APK_PATH
-          
-          # 2. Run the specified Maestro flow and generate the JUnit report
-          MAESTRO_REPORT_PATH="maestro-report.xml"
-          MAESTRO_FLOW_PATH="./samples/android-test.yaml"
-          
-          echo "Running Maestro flow: $MAESTRO_FLOW_PATH"
-          
-          maestro test \
-            $MAESTRO_FLOW_PATH \
-            --format junit \
-            --output $MAESTRO_REPORT_PATH \
-            || true 
-          
-          # 3. Prepare report for artifact upload
-          mkdir -p maestro-reports
-          if [ -f $MAESTRO_REPORT_PATH ]; then
-            mv $MAESTRO_REPORT_PATH maestro-reports/
-            echo "Maestro test run complete. Report moved to maestro-reports/."
-          else
-            echo "Warning: Maestro report file ($MAESTRO_REPORT_PATH) not found. Check the Maestro run logs."
-          fi
+      # 3. Start Android Emulator with the latest version
+      # Note: We use a standard GitHub action for robust emulator setup
+      - name: Run Android Emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34 # Use a recent API level (Android 14)
+          target: default
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -cores 2 -memory 4096M -no-snapshot-save
+          disable-animations: true
+          # Note: We skip the app installation here, assuming the 'maestro test' command handles it if needed.
 
-    - name: Upload Test Report Artifact
-      if: always() 
-      uses: actions/upload-artifact@v4
-      with:
-        name: maestro-junit-report
-        path: maestro-reports/maestro-report.xml
+      # 4. Install the application (samples/wikipedia.apk)
+      - name: Install Target APK
+        run: adb install -r samples/wikipedia.apk
+        # The APK needs to be available in the repository path 'samples/wikipedia.apk'
+
+      # 5. Run Maestro tests and generate JUnit report
+      - name: Execute Maestro Flow & Generate Report
+        id: maestro_run
+        # The 'maestro test' command can automatically launch the app and run the flow.
+        # We redirect the JUnit output to a file for artifact storage.
+        run: |
+          echo "Running Maestro tests using the flow maestro-android.yaml"
+          # Run the test, outputting results in JUnit XML format
+          maestro test maestro-android.yaml --format junit > maestro-report.xml
+
+      # 6. Upload the generated test report
+      - name: Upload Test Results Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: maestro-test-report
+          path: maestro-report.xml
+          retention-days: 5
