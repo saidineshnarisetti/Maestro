@@ -47,7 +47,12 @@ jobs:
 
       # 4. Install the application (samples/wikipedia.apk)
       - name: Install Target APK
-        run: adb install -r samples/wikipedia.apk
+        run: |
+          echo "Checking if adb is on PATH..."
+          # This command will print the path to adb or fail with exit 1 if not found.
+          which adb
+          echo "Installing samples/wikipedia.apk..."
+          adb install -r samples/wikipedia.apk
         # The APK needs to be available in the repository path 'samples/wikipedia.apk'
 
       # 5. Run Maestro tests and generate JUnit report
