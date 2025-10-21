@@ -10,8 +10,8 @@ on:
 
 jobs:
   maestro_e2e_android:
-    # Use macos-latest which is an Apple Silicon (aarch64) runner by default, 
-    # requiring an ARM-based emulator image (arch: arm64).
+    # Use macos-latest as it is an Apple Silicon (aarch64) runner, which is required
+    # for the faster ARM emulator images.
     runs-on: macos-latest 
 
     steps:
@@ -36,27 +36,29 @@ jobs:
     - name: Run Android Emulator and Maestro Tests
       uses: reactivecircus/android-emulator-runner@v2
       with:
-        api-level: 30 # Target Android API level
-        # 🔥 FIX for "Avd's CPU Architecture 'x86_64' is not supported on aarch64 host"
-        # Must use arm64 architecture on Apple Silicon runners
-        arch: arm64 
-        target: google_apis # Using google_apis for better compatibility with arm64 images
+        api-level: 30 
+        target: google_apis 
         profile: Nexus 5
+        
+        # 🟢 FIX: The action supports 'arm64-v8a' for ARM runners, not 'arm64'.
+        # This resolves the "Value for input.arch 'arm64' is unknown" error.
+        arch: arm64-v8a 
+        
         script: |
+          # The emulator is ready and adb is available in the PATH here.
+          
           # 1. Install the APK
-          # Replace './samples/wikipedia.apk' with the actual path if it changes
           APK_PATH="./samples/wikipedia.apk" 
           echo "Installing $APK_PATH on emulator..."
           adb install $APK_PATH
           
-          # 2. Run the specified Maestro flow
+          # 2. Run the specified Maestro flow and generate the JUnit report
           MAESTRO_REPORT_PATH="maestro-report.xml"
-          MAESTRO_FLOW_PATH="./samples/android-test.yaml" # Target flow
+          MAESTRO_FLOW_PATH="./samples/android-test.yaml"
           
           echo "Running Maestro flow: $MAESTRO_FLOW_PATH"
           
-          # The || true ensures the step doesn't fail the whole job immediately 
-          # on a test failure, allowing the report to be uploaded.
+          # The || true ensures the job proceeds to the report upload step even if a test fails.
           maestro test \
             $MAESTRO_FLOW_PATH \
             --format junit \
@@ -67,13 +69,13 @@ jobs:
           mkdir -p maestro-reports
           if [ -f $MAESTRO_REPORT_PATH ]; then
             mv $MAESTRO_REPORT_PATH maestro-reports/
-            echo "Maestro test run complete. Report moved to maestro-reports/"
+            echo "Maestro test run complete. Report moved to maestro-reports/."
           else
-            echo "Warning: Maestro report file ($MAESTRO_REPORT_PATH) not found."
+            echo "Warning: Maestro report file ($MAESTRO_REPORT_PATH) not found. Check the Maestro run logs."
           fi
 
     - name: Upload Test Report Artifact
-      # The report will be uploaded even if the tests themselves failed (due to 'if: always()')
+      # Run this step always so you can see the report regardless of test outcome.
       if: always() 
       uses: actions/upload-artifact@v4
       with:
