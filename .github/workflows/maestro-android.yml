@@ -20,6 +20,7 @@ jobs:
           java-version: '17'
       
       # 2. Prepare Maestro Workspace
+      # The Maestro Cloud Action expects flow files to be inside the .maestro/ directory.
       - name: Prepare Maestro Workspace
         run: |
           echo "Creating .maestro/ directory and copying flow file..."
@@ -31,8 +32,7 @@ jobs:
           ls -R .maestro
           
       # 3. Run Maestro Tests on Maestro Cloud
-      # Removed the unsupported 'flow-file' parameter. The action will now automatically 
-      # find and run the 'android-test.yaml' file inside the '.maestro/' workspace.
+      # The action automatically uploads test files from the .maestro/ workspace.
       - name: Run Maestro Tests on Cloud
         uses: mobile-dev-inc/action-maestro-cloud@v1
         with:
@@ -43,5 +43,13 @@ jobs:
           # Path to the pre-committed APK
           app-file: samples/wikipedia.apk 
           # The workspace is automatically determined as .maestro/
-          # Path to your Maestro flow file
-          flow-file: samples/android-test.yaml
+          # Removed unsupported 'flow-file' parameter: The test action automatically finds it in .maestro/
+          # Add any other parameters here, like tags or environments
+      # 4. Reporting Information (Informational Step)
+      - name: View Detailed Test Reports
+        run: |
+          echo "--------------------------------------------------------"
+          echo "Maestro test run is complete!"
+          echo "All comprehensive test results, including detailed execution steps, video recordings, and screenshots for every test, are available at the Maestro Cloud Dashboard:"
+          echo "https://app.maestro.dev/"
+          echo "--------------------------------------------------------"
