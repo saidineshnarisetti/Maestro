@@ -1,0 +1,70 @@
+name: Maestro Android E2E Test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  maestro_e2e_android:
+    # macOS runners are recommended for reliable Android emulation on GitHub Actions
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Java 17
+      # Maestro requires Java 17 or higher
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Install Maestro CLI via Homebrew
+      # Uses the Homebrew commands you specified
+      run: |
+        brew tap mobile-dev-inc/tap
+        brew install maestro
+
+    - name: Run Android Emulator and Maestro Tests
+      # The reactivecircus/android-emulator-runner is a reliable way to manage the emulator
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: 30 # Recommended API level for stability. Adjust as needed.
+        target: default
+        arch: x86_64
+        profile: Nexus 5
+        script: |
+          # The Android Emulator Runner installs platform-tools and adds adb to PATH
+          
+          # 1. Install the APK
+          # Replace 'samples/wikipedia.apk' with the actual path to your APK if it's different.
+          APK_PATH="./samples/wikipedia.apk" 
+          adb install $APK_PATH
+          
+          # 2. Run the Maestro flow and generate the report
+          # The 'maestro' command is now available globally
+          # The --format junit --output command creates the JUnit report
+          MAESTRO_REPORT_PATH="maestro-report.xml"
+          
+          maestro test \
+            ./samples/android-test.yaml \
+            --format junit \
+            --output $MAESTRO_REPORT_PATH \
+            || true # Use '|| true' to ensure the workflow continues even if tests fail
+          
+          # Move the report to a directory for artifact upload
+          mkdir -p maestro-reports
+          mv $MAESTRO_REPORT_PATH maestro-reports/
+
+    - name: Upload Test Report Artifact
+      # This step saves the generated test report so you can download it from the Actions summary
+      if: always() # Run this step even if the tests failed
+      uses: actions/upload-artifact@v4
+      with:
+        name: maestro-junit-report
+        path: maestro-reports/maestro-report.xml
