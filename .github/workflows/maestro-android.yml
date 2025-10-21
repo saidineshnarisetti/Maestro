@@ -21,10 +21,22 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17'
-
-      # 2. Run Maestro Tests on Maestro Cloud
-      # This action now uses pre-committed files (samples/wikipedia.apk and samples/android-test.yaml),
-      # effectively running the command: maestro cloud --api-key=... samples/wikipedia.apk samples/android-test.yaml
+      
+      # 2. Prepare Maestro Workspace
+      # The Maestro Cloud Action expects flow files to be inside the .maestro/ directory.
+      - name: Prepare Maestro Workspace
+        run: |
+          echo "Creating .maestro/ directory and copying flow file..."
+          # Create the required default workspace directory
+          mkdir -p .maestro
+          # Copy the flow file from 'samples/' into the workspace
+          cp samples/android-test.yaml .maestro/
+          # Optional: List contents to confirm
+          ls -R .maestro
+          
+      # 3. Run Maestro Tests on Maestro Cloud
+      # Removed the unsupported 'flow-file' parameter. The action will now automatically 
+      # find and run the 'android-test.yaml' file inside the '.maestro/' workspace.
       - name: Run Maestro Tests on Cloud
         uses: mobile-dev-inc/action-maestro-cloud@v1
         with:
@@ -34,6 +46,6 @@ jobs:
           project-id: ${{ secrets.MAESTRO_PROJECT_ID }} 
           # Path to the pre-committed APK
           app-file: samples/wikipedia.apk 
+          # The workspace is automatically determined as .maestro/
           # Path to your Maestro flow file
           flow-file: samples/android-test.yaml
-          # Add any other parameters here, like tags or environments
