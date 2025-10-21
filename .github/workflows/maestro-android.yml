@@ -22,11 +22,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # 2. Install Maestro (using Homebrew as suggested)
+      # 2. Install Maestro CLI (using cURL for Linux/Ubuntu runners)
       - name: Install Maestro CLI
         run: |
-          brew tap mobile-dev-inc/tap
-          brew install maestro
+          # Use the official install script for Maestro CLI
+          curl -Ls "https://install.maestro.mobile.dev" | bash
+          # Add Maestro to the PATH for subsequent steps
+          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
           # Verify installation
           maestro -v
 
