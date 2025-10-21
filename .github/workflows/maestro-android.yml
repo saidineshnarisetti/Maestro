@@ -1,4 +1,4 @@
-name: Maestro Android E2E Tests
+name: Build and run Maestro tests (Native Android)
 
 on:
   # Run tests whenever code is pushed to main or a Pull Request is opened
@@ -8,72 +8,32 @@ on:
     branches: [ main ]
 
 jobs:
-  maestro_test:
+  maestro-cloud-test:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 1. Set up Java 17 (as requested)
+      # 1. Set up Java 17 (Adhering to your original requested version for the build process)
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 2. Install Maestro CLI (using cURL for Linux/Ubuntu runners)
-      - name: Install Maestro CLI
-        run: |
-          # Use the official install script for Maestro CLI
-          curl -Ls "https://install.maestro.mobile.dev" | bash
-          
-          # Manually add Maestro to the PATH for the CURRENT shell session (required for maestro -v below)
-          export PATH="$HOME/.maestro/bin:$PATH"
-          
-          # Add Maestro to the PATH for subsequent steps (persists across steps)
-          echo "$HOME/.maestro/bin" >> $GITHUB_PATH
-          
-          # Verify installation
-          maestro -v
-
-      # 3. Start Android Emulator with the latest version
-      # Note: We use a standard GitHub action for robust emulator setup
-      - name: Run Android Emulator
-        uses: reactivecircus/android-emulator-runner@v2
+      # 2. Run Maestro Tests on Maestro Cloud
+      # This action now uses pre-committed files (samples/wikipedia.apk and samples/android-test.yaml),
+      # effectively running the command: maestro cloud --api-key=... samples/wikipedia.apk samples/android-test.yaml
+      - name: Run Maestro Tests on Cloud
+        uses: mobile-dev-inc/action-maestro-cloud@v1
         with:
-          api-level: 34 # Use a recent API level (Android 14)
-          target: default
-          arch: x86_64
-          force-avd-creation: false
-          emulator-options: -cores 2 -memory 4096M -no-snapshot-save
-          disable-animations: true
-          # Note: We skip the app installation here, assuming the 'maestro test' command handles it if needed.
-
-      # 4. Install the application (samples/wikipedia.apk)
-      - name: Install Target APK
-        run: |
-          echo "Checking if adb is on PATH..."
-          # This command will print the path to adb or fail with exit 1 if not found.
-          which adb
-          echo "Installing samples/wikipedia.apk..."
-          adb install -r samples/wikipedia.apk
-        # The APK needs to be available in the repository path 'samples/wikipedia.apk'
-
-      # 5. Run Maestro tests and generate JUnit report
-      - name: Execute Maestro Flow & Generate Report
-        id: maestro_run
-        # The 'maestro test' command can automatically launch the app and run the flow.
-        # We redirect the JUnit output to a file for artifact storage.
-        run: |
-          echo "Running Maestro tests using the flow maestro-android.yaml"
-          # Run the test, outputting results in JUnit XML format
-          maestro test maestro-android.yaml --format junit > maestro-report.xml
-
-      # 6. Upload the generated test report
-      - name: Upload Test Results Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: maestro-test-report
-          path: maestro-report.xml
-          retention-days: 5
+          # Your API Key, which must be stored securely as a repository secret (secrets.MAESTRO_API_KEY)
+          api-key: ${{ secrets.MAESTRO_API_KEY }} 
+          # Your Project ID
+          project-id: ${{ secrets.MAESTRO_PROJECT_ID }} 
+          # Path to the pre-committed APK
+          app-file: samples/wikipedia.apk 
+          # Path to your Maestro flow file
+          flow-file: samples/android-test.yaml
+          # Add any other parameters here, like tags or environments
